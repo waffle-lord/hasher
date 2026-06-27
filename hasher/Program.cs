@@ -1,10 +1,9 @@
 ﻿/* hasher.exe
         validate
         create
+            <file_path>
             --Algorithm
                 valid options: MD5, SHA1, SHA256, SHA384, SHA512
-            --Path
-                <file_path>
 */
 
 // options
