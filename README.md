@@ -1,2 +1,2 @@
 # hasher
-Just a simple hashing tool
+A simple, portable, directory hashing tool
