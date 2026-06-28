@@ -88,7 +88,7 @@ createCommand.SetAction(async parseResult =>
             var relativeFilePath = file.FullName.Replace(dirInfo.FullName, string.Empty);
             var hash = await FileHelper.GetFileHashAsync(algorithm, file);
             outputBag.Add($"{hash} :: {relativeFilePath}");
-            AnsiConsole.MarkupLine($"[yellow]{hash}[/] [gray]::[/] [yellow]{relativeFilePath}[/]");
+            AnsiConsole.MarkupLine($"[yellow]{hash.EscapeMarkup()}[/] [gray]::[/] [yellow]{relativeFilePath.EscapeMarkup()}[/]");
             task.Increment(1);
             task.Description = $"Hashing files ( {task.Value} / {task.MaxValue} )";
             ctx.Refresh();
@@ -100,7 +100,7 @@ createCommand.SetAction(async parseResult =>
         await File.WriteAllLinesAsync(outputFilePath, outputBag);
     });
         
-    AnsiConsole.MarkupLine($"[green]hash data saved: {outputFile.FullName}[/]");
+    AnsiConsole.MarkupLine($"[green]hash data saved: {outputFile.FullName.EscapeMarkup()}[/]");
 });
         
 validateCommand.SetAction(async parseResult=>
@@ -149,11 +149,11 @@ validateCommand.SetAction(async parseResult=>
             if (hashData.Contains($"{hash} :: {relativeFilePath}"))
             {
                 okCount++;
-                AnsiConsole.MarkupLine($"[green]{hash}[/] [gray]::[/] [green]{relativeFilePath}[/]");
+                AnsiConsole.MarkupLine($"[green]{hash.EscapeMarkup()}[/] [gray]::[/] [green]{relativeFilePath.EscapeMarkup()}[/]");
             }
             else
             {
-                AnsiConsole.MarkupLine($"[red]{hash}[/] [gray]::[/] [red]{relativeFilePath}[/]");
+                AnsiConsole.MarkupLine($"[red]{hash.EscapeMarkup()}[/] [gray]::[/] [red]{relativeFilePath.EscapeMarkup()}[/]");
             }
             
             task.Increment(1);
