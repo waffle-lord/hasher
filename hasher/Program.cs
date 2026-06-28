@@ -177,10 +177,11 @@ var rootCommand = new RootCommand("A simple, portable, directory hashing tool")
 };
 
 // startup banner for fancy
+var version = Assembly.GetExecutingAssembly().GetName().Version;
 var figlet = new FigletText("Hasher").Color(Color.Blue);
 var rule = new Rule
 {
-    Title = "[purple]A simple, portable, directory hashing tool[/]",
+    Title = $"[purple]A simple, portable, directory hashing tool[/] [gray]( v[/][yellow]{version?.ToString().EscapeMarkup() ?? "n/a"}[/] [gray])[/]",
     Justification = Justify.Left,
     Style = new Style().Foreground(Color.Blue),
 };
