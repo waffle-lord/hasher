@@ -27,43 +27,53 @@ public static class FileHelper
     {
         return algorithm switch
         {
-            SupportedAlgorithms.MD5 => await GetMD5HashAsync(fileInfo),
-            SupportedAlgorithms.SHA1 => await GetSHA1HashAsync(fileInfo),
-            SupportedAlgorithms.SHA256 => await GetSHA256HashAsync(fileInfo),
-            SupportedAlgorithms.SHA384 => await GetSHA384HashAsync(fileInfo),
-            SupportedAlgorithms.SHA512 => await GetSHA512HashAsync(fileInfo),
+            SupportedAlgorithms.MD5 => await GetMd5HashAsync(fileInfo),
+            SupportedAlgorithms.SHA1 => await GetSha1HashAsync(fileInfo),
+            SupportedAlgorithms.SHA256 => await GetSha256HashAsync(fileInfo),
+            SupportedAlgorithms.SHA384 => await GetSha384HashAsync(fileInfo),
+            SupportedAlgorithms.SHA512 => await GetSha512HashAsync(fileInfo),
             _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, null)
         };
     }
     
-    private static async Task<string> GetMD5HashAsync(FileInfo fileInfo)
+    private static async Task<string> GetMd5HashAsync(FileInfo fileInfo)
     {
         using var md5 = MD5.Create();
-        using (var stream = fileInfo.OpenRead())
-        {
-            var hash = await md5.ComputeHashAsync(stream);
-            return BitConverter.ToString(hash).Replace("-", "").ToUpperInvariant();
-        }
+        await using var stream = fileInfo.OpenRead();
+        var hash = await md5.ComputeHashAsync(stream);
+        return Convert.ToHexString(hash).ToUpperInvariant();
     }
 
-    private static async Task<string> GetSHA1HashAsync(FileInfo fileInfo)
+    private static async Task<string> GetSha1HashAsync(FileInfo fileInfo)
     {
-        throw new NotImplementedException();
+        using var sha1 = SHA1.Create();
+        await using var stream = fileInfo.OpenRead();
+        var hash = await sha1.ComputeHashAsync(stream);
+        return Convert.ToHexString(hash).ToUpperInvariant();
     }
     
-    private static async Task<string> GetSHA256HashAsync(FileInfo fileInfo)
+    private static async Task<string> GetSha256HashAsync(FileInfo fileInfo)
     {
-        throw new NotImplementedException();
+        using var sha256 = SHA256.Create();
+        await using var stream = fileInfo.OpenRead();
+        var hash = await sha256.ComputeHashAsync(stream);
+        return Convert.ToHexString(hash).ToUpperInvariant();
     }
 
-    private static async Task<string> GetSHA384HashAsync(FileInfo fileInfo)
+    private static async Task<string> GetSha384HashAsync(FileInfo fileInfo)
     {
-        throw new NotImplementedException();
+        using var sha384 = SHA384.Create();
+        await using var stream = fileInfo.OpenRead();
+        var hash = await sha384.ComputeHashAsync(stream);
+        return Convert.ToHexString(hash).ToUpperInvariant();
     }
 
-    private static async Task<string> GetSHA512HashAsync(FileInfo fileInfo)
+    private static async Task<string> GetSha512HashAsync(FileInfo fileInfo)
     {
-        throw new NotImplementedException();
+        using var sha512 = SHA512.Create();
+        await using var stream = fileInfo.OpenRead();
+        var hash = await sha512.ComputeHashAsync(stream);
+        return Convert.ToHexString(hash).ToUpperInvariant();
     }
     
 }
