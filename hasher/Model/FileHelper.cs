@@ -1,9 +1,17 @@
 ﻿using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Spectre.Console;
 
 namespace hasher.Model;
 
 public static class FileHelper
 {
+    public static async Task SaveToJsonAsync<T>(T objectToSave, string filePath)
+    {
+        var json = JsonSerializer.Serialize (objectToSave, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(filePath, json);
+    }
     
     public static List<FileInfo> GetFilesToCheck(DirectoryInfo directory, List<FileInfo> exclusions)
     {
@@ -75,5 +83,4 @@ public static class FileHelper
         var hash = await sha512.ComputeHashAsync(stream);
         return Convert.ToHexString(hash).ToUpperInvariant();
     }
-    
 }

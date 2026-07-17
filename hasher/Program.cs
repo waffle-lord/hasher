@@ -11,6 +11,7 @@ using System.CommandLine;
 using System.Reflection;
 using hasher.Model;
 using Spectre.Console;
+using ValidationResult = hasher.Model.ValidationResult;
 
 // options
 var algorithmOption = new Option<SupportedAlgorithms>("--algorithm")
@@ -18,6 +19,20 @@ var algorithmOption = new Option<SupportedAlgorithms>("--algorithm")
     Description = "The algorithm to use to create the hashes",
     DefaultValueFactory = _ => SupportedAlgorithms.MD5,
     Recursive = true
+};
+
+var saveResultsOption = new Option<bool>("--save-results")
+{
+    Description = "Save the results of validation to a json file",
+    Arity = ArgumentArity.ZeroOrOne,
+    DefaultValueFactory = _ => false
+};
+
+var showStatsOption = new Option<bool>("--show-stats")
+{
+    Description = "Show stats at the end of operation",
+    Arity = ArgumentArity.ZeroOrOne,
+    DefaultValueFactory = _ => false
 };
 
 // arguments
@@ -30,12 +45,13 @@ var pathArgument = new Argument<string>("path")
 // commands
 var createCommand = new Command("create")
 {
-    Arguments = { pathArgument }
+    Arguments = { pathArgument },
 };
 
 var validateCommand = new Command("validate")
 {
-    Arguments = { pathArgument }
+    Arguments = { pathArgument },
+    Options = { saveResultsOption, showStatsOption }
 };
         
 // command actions
@@ -103,10 +119,12 @@ createCommand.SetAction(async parseResult =>
     AnsiConsole.MarkupLine($"[green]hash data saved: {outputFile.FullName.EscapeMarkup()}[/]");
 });
         
-validateCommand.SetAction(async parseResult=>
+validateCommand.SetAction(async parseResult =>
 {
     var pathArg = parseResult.GetValue(pathArgument);
     var algorithm = parseResult.GetValue(algorithmOption);
+    var showStats = parseResult.GetValue(showStatsOption);
+    var saveResults = parseResult.GetValue(saveResultsOption);
     
     AnsiConsole.MarkupLine($"[Gray]Algorithm :[/] [blue]{algorithm}[/]");
     AnsiConsole.MarkupLine($"[Gray]Path      :[/] [blue]{pathArg}[/]");
@@ -123,14 +141,49 @@ validateCommand.SetAction(async parseResult=>
         return;
     }
 
-    var hashData = File.ReadAllLines(hashFile.FullName);
-    
+    var hashDataContents = File.ReadAllLines(hashFile.FullName);
+    var hashDataList = hashDataContents.Select(line => new HashData(line)).ToList();
+
     // don't include the currently running program AND hash file in the event current directory is selected
     var programFile = new FileInfo(Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location);
     var fileList = FileHelper.GetFilesToCheck(dirInfo, [programFile, hashFile]);
     
     var cancelTokenSource = new CancellationTokenSource();
-    var okCount = 0;
+    
+    var results = new FileValidationResults();
+    
+    var hashAction = saveResults
+        ? new Action<string, string, string, ValidationResult>((expectedHash, actualHash, relativePath, validationResult) => 
+        {
+            var color = validationResult switch
+            {
+                ValidationResult.Match => Color.Green,
+                ValidationResult.Mismatch => Color.Red,
+                ValidationResult.Missing => Color.Yellow,
+                ValidationResult.Unexpected => Color.Blue,
+                _ => Color.Aqua
+            };
+
+            results.AddAndCount(new FileCheckResult(expectedHash, actualHash, relativePath, validationResult));
+            var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
+            AnsiConsole.MarkupLine($"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
+        })
+        : new Action<string, string, string, ValidationResult>((_, actualHash, relativePath,
+            validationResult) =>
+        {
+            var color = validationResult switch
+            {
+                ValidationResult.Match => Color.Green,
+                ValidationResult.Mismatch => Color.Red,
+                ValidationResult.Missing => Color.Yellow,
+                ValidationResult.Unexpected => Color.Blue,
+                _ => Color.Aqua
+            };
+                
+            results.CountOnly(validationResult);
+            var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
+            AnsiConsole.MarkupLine($"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
+        });
 
     await AnsiConsole.Progress().Columns(
         new SpinnerColumn(),
@@ -146,27 +199,51 @@ validateCommand.SetAction(async parseResult=>
         {
             var relativeFilePath = file.FullName.Replace(dirInfo.FullName, string.Empty);
             var hash = await FileHelper.GetFileHashAsync(algorithm, file);
-            if (hashData.Contains($"{hash} :: {relativeFilePath}"))
+
+            var foundHash = hashDataList.FirstOrDefault(x => x.RelativePath == relativeFilePath);
+            
+            if (foundHash == null)
             {
-                okCount++;
-                AnsiConsole.MarkupLine($"[green]{hash.EscapeMarkup()}[/] [gray]::[/] [green]{relativeFilePath.EscapeMarkup()}[/]");
+                // unexpected file
+                hashAction.Invoke("n/a", hash, relativeFilePath, ValidationResult.Unexpected);
+            }
+            else if (foundHash.Hash == hash)
+            {
+                // match hash
+                hashAction.Invoke(foundHash.Hash, hash, relativeFilePath, ValidationResult.Match);
+                hashDataList.Remove(foundHash);
             }
             else
             {
-                AnsiConsole.MarkupLine($"[red]{hash.EscapeMarkup()}[/] [gray]::[/] [red]{relativeFilePath.EscapeMarkup()}[/]");
+                // mismatch hash
+                hashAction.Invoke(foundHash.Hash, hash, relativeFilePath, ValidationResult.Mismatch);
+                hashDataList.Remove(foundHash);
             }
-            
+
             task.Increment(1);
             task.Description = $"Validating files ( {task.Value} / {task.MaxValue} )";
             ctx.Refresh();
         });
     });
 
+    if (hashDataList.Count > 0)
+    {
+        foreach (var hashData in hashDataList)
+        {
+            // missing files
+            hashAction.Invoke(hashData.Hash, "n/a", hashData.RelativePath, ValidationResult.Missing);
+        }
+    }
+
     AnsiConsole.Write(new Rule {Style =  new Style().Foreground(Color.Gray)});
 
-    AnsiConsole.MarkupLine(okCount == fileList.Count
-        ? "[green]All files are OK[/]"
-        : "[red]Some files failed validation[/]");
+    // replace this with a table or chart
+    
+    AnsiConsole.WriteLine("alksjdflk");
+    
+    // AnsiConsole.MarkupLine(okCount == fileList.Count
+    //     ? "[green]All files are OK[/]"
+    //     : "[red]Some files failed validation[/]");
 });
 
 // root command
