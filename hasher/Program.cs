@@ -17,6 +17,7 @@ using ValidationResult = hasher.Model.ValidationResult;
 var algorithmOption = new Option<SupportedAlgorithms>("--algorithm")
 {
     Description = "The algorithm to use to create the hashes",
+    Aliases = { "-a" },
     DefaultValueFactory = _ => SupportedAlgorithms.MD5,
     Recursive = true
 };
@@ -24,6 +25,7 @@ var algorithmOption = new Option<SupportedAlgorithms>("--algorithm")
 var saveResultsOption = new Option<bool>("--save-results")
 {
     Description = "Save the results of validation to a json file",
+    Aliases = { "-sr", "-save" },
     Arity = ArgumentArity.ZeroOrOne,
     DefaultValueFactory = _ => false
 };
@@ -31,6 +33,7 @@ var saveResultsOption = new Option<bool>("--save-results")
 var showStatsOption = new Option<bool>("--show-stats")
 {
     Description = "Show stats at the end of operation",
+    Aliases = { "-ss", "-stats" },
     Arity = ArgumentArity.ZeroOrOne,
     DefaultValueFactory = _ => false
 };
@@ -38,6 +41,7 @@ var showStatsOption = new Option<bool>("--show-stats")
 var progressOnlyOption = new Option<bool>("--progress-only")
 {
     Description = "Show only the progress of hashing. Do not output the hash info the screen",
+    Aliases = { "-po" },
     Arity = ArgumentArity.ZeroOrOne,
     DefaultValueFactory = _ => false,
     Recursive = true
@@ -54,11 +58,13 @@ var pathArgument = new Argument<string>("path")
 var createCommand = new Command("create")
 {
     Arguments = { pathArgument },
+    Aliases = { "c" },
 };
 
 var validateCommand = new Command("validate")
 {
     Arguments = { pathArgument },
+    Aliases = { "v" },
     Options = { saveResultsOption, showStatsOption }
 };
         
