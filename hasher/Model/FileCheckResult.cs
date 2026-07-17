@@ -6,10 +6,10 @@ public class FileCheckResult(
     string relativePath,
     ValidationResult validationResult)
 {
-    public readonly string ExpectedHash = expectedHash;
-    public readonly string ActualHash = actualHash;
+    public string ExpectedHash { get; }= expectedHash;
+    public string ActualHash { get; }= actualHash;
 
     public bool Ok =>  ActualHash == ExpectedHash;
-    public string RelativePath = relativePath;
-    public ValidationResult ValidationResult = validationResult;
+    public string RelativePath { get; }= relativePath;
+    public ValidationResult ValidationResult { get; } = validationResult;
 }

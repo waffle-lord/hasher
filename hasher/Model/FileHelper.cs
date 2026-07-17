@@ -1,16 +1,15 @@
 ﻿using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Spectre.Console;
 
 namespace hasher.Model;
 
 public static class FileHelper
 {
-    public static async Task SaveToJsonAsync<T>(T objectToSave, string filePath)
+    public static async Task SaveToJsonAsync<T>(T objectToSave, FileInfo filePath)
     {
-        var json = JsonSerializer.Serialize (objectToSave, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(filePath, json);
+        var json = JsonSerializer.Serialize (objectToSave, new JsonSerializerOptions { WriteIndented = true, Converters = { new JsonStringEnumConverter() }});
+        await File.WriteAllTextAsync(filePath.FullName, json);
     }
     
     public static List<FileInfo> GetFilesToCheck(DirectoryInfo directory, List<FileInfo> exclusions)

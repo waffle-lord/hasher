@@ -35,6 +35,14 @@ var showStatsOption = new Option<bool>("--show-stats")
     DefaultValueFactory = _ => false
 };
 
+var progressOnlyOption = new Option<bool>("--progress-only")
+{
+    Description = "Show only the progress of hashing. Do not output the hash info the screen",
+    Arity = ArgumentArity.ZeroOrOne,
+    DefaultValueFactory = _ => false,
+    Recursive = true
+};
+
 // arguments
 var pathArgument = new Argument<string>("path")
 {
@@ -59,6 +67,7 @@ createCommand.SetAction(async parseResult =>
 {
     var pathArg = parseResult.GetValue(pathArgument);
     var algorithm = parseResult.GetValue(algorithmOption);
+    var progressOnly = parseResult.GetValue(progressOnlyOption);
     
     AnsiConsole.MarkupLine($"[Gray]Algorithm :[/] [blue]{algorithm}[/]");
     AnsiConsole.MarkupLine($"[Gray]Path      :[/] [blue]{pathArg}[/]");
@@ -104,7 +113,12 @@ createCommand.SetAction(async parseResult =>
             var relativeFilePath = file.FullName.Replace(dirInfo.FullName, string.Empty);
             var hash = await FileHelper.GetFileHashAsync(algorithm, file);
             outputBag.Add($"{hash} :: {relativeFilePath}");
-            AnsiConsole.MarkupLine($"[yellow]{hash.EscapeMarkup()}[/] [gray]::[/] [yellow]{relativeFilePath.EscapeMarkup()}[/]");
+
+            if (!progressOnly)
+            {
+                AnsiConsole.MarkupLine($"[yellow]{hash.EscapeMarkup()}[/] [gray]::[/] [yellow]{relativeFilePath.EscapeMarkup()}[/]");
+            }
+            
             task.Increment(1);
             task.Description = $"Hashing files ( {task.Value} / {task.MaxValue} )";
             ctx.Refresh();
@@ -125,6 +139,7 @@ validateCommand.SetAction(async parseResult =>
     var algorithm = parseResult.GetValue(algorithmOption);
     var showStats = parseResult.GetValue(showStatsOption);
     var saveResults = parseResult.GetValue(saveResultsOption);
+    var progressOnly = parseResult.GetValue(progressOnlyOption);
     
     AnsiConsole.MarkupLine($"[Gray]Algorithm :[/] [blue]{algorithm}[/]");
     AnsiConsole.MarkupLine($"[Gray]Path      :[/] [blue]{pathArg}[/]");
@@ -152,38 +167,43 @@ validateCommand.SetAction(async parseResult =>
     
     var results = new FileValidationResults();
     
-    var hashAction = saveResults
-        ? new Action<string, string, string, ValidationResult>((expectedHash, actualHash, relativePath, validationResult) => 
-        {
-            var color = validationResult switch
-            {
-                ValidationResult.Match => Color.Green,
-                ValidationResult.Mismatch => Color.Red,
-                ValidationResult.Missing => Color.Yellow,
-                ValidationResult.Unexpected => Color.Blue,
-                _ => Color.Aqua
-            };
+    Color GetValidationColor(ValidationResult result) => result switch
+    {
+        ValidationResult.Match => Color.Green,
+        ValidationResult.Mismatch => Color.Red,
+        ValidationResult.Missing => Color.Yellow,
+        ValidationResult.Unexpected => Color.Blue,
+        _ => Color.Aqua
+    };
 
-            results.AddAndCount(new FileCheckResult(expectedHash, actualHash, relativePath, validationResult));
-            var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
-            AnsiConsole.MarkupLine($"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
-        })
-        : new Action<string, string, string, ValidationResult>((_, actualHash, relativePath,
-            validationResult) =>
+    var hashAction = new Action<string, string, string, ValidationResult>((_, actualHash, relativePath, validationResult) =>
+    {
+        var color = GetValidationColor(validationResult);
+        results.CountOnly(validationResult);
+
+        if (!progressOnly)
         {
-            var color = validationResult switch
-            {
-                ValidationResult.Match => Color.Green,
-                ValidationResult.Mismatch => Color.Red,
-                ValidationResult.Missing => Color.Yellow,
-                ValidationResult.Unexpected => Color.Blue,
-                _ => Color.Aqua
-            };
-                
-            results.CountOnly(validationResult);
             var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
-            AnsiConsole.MarkupLine($"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
-        });
+            AnsiConsole.MarkupLine(
+                $"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
+        }
+    });
+
+    if (saveResults)
+    {
+        hashAction = (expectedHash, actualHash, relativePath, validationResult) =>
+            {
+                var color = GetValidationColor(validationResult);
+                results.AddAndCount(new FileCheckResult(expectedHash, actualHash, relativePath, validationResult));
+                
+                if (!progressOnly)
+                {
+                    var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
+                    AnsiConsole.MarkupLine(
+                        $"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
+                }
+            };
+    }
 
     await AnsiConsole.Progress().Columns(
         new SpinnerColumn(),
@@ -199,7 +219,7 @@ validateCommand.SetAction(async parseResult =>
         {
             var relativeFilePath = file.FullName.Replace(dirInfo.FullName, string.Empty);
             var hash = await FileHelper.GetFileHashAsync(algorithm, file);
-
+            
             var foundHash = hashDataList.FirstOrDefault(x => x.RelativePath == relativeFilePath);
             
             if (foundHash == null)
@@ -211,13 +231,13 @@ validateCommand.SetAction(async parseResult =>
             {
                 // match hash
                 hashAction.Invoke(foundHash.Hash, hash, relativeFilePath, ValidationResult.Match);
-                hashDataList.Remove(foundHash);
+                foundHash.Found = true;
             }
             else
             {
                 // mismatch hash
                 hashAction.Invoke(foundHash.Hash, hash, relativeFilePath, ValidationResult.Mismatch);
-                hashDataList.Remove(foundHash);
+                foundHash.Found = true;
             }
 
             task.Increment(1);
@@ -228,7 +248,7 @@ validateCommand.SetAction(async parseResult =>
 
     if (hashDataList.Count > 0)
     {
-        foreach (var hashData in hashDataList)
+        foreach (var hashData in hashDataList.Where(x => !x.Found))
         {
             // missing files
             hashAction.Invoke(hashData.Hash, "n/a", hashData.RelativePath, ValidationResult.Missing);
@@ -236,20 +256,41 @@ validateCommand.SetAction(async parseResult =>
     }
 
     AnsiConsole.Write(new Rule {Style =  new Style().Foreground(Color.Gray)});
+    
+    AnsiConsole.MarkupLine(results.TotalMatch == fileList.Count
+        ? "[green]All files are OK[/]"
+        : "[red]Some files failed validation[/]");
 
-    // replace this with a table or chart
-    
-    AnsiConsole.WriteLine("alksjdflk");
-    
-    // AnsiConsole.MarkupLine(okCount == fileList.Count
-    //     ? "[green]All files are OK[/]"
-    //     : "[red]Some files failed validation[/]");
+    if (showStats)
+    {
+        // output stats
+        AnsiConsole.WriteLine();
+        var chart = new BarChart()
+            .AddItem("Match", results.TotalMatch, Color.Green)
+            .AddItem("Mismatch", results.TotalMisMatch, Color.Red)
+            .AddItem("Missing", results.TotalMissing, Color.Yellow)
+            .AddItem("Unexpected", results.TotalUnexpected, Color.Blue);
+
+        chart.Width = 100;
+        
+        AnsiConsole.Write(chart);
+    }
+
+    if (saveResults)
+    {
+        // save results to file
+        var resultsFile = new FileInfo(Path.Join(pathArg, $"{dirInfo.Name.Replace(" ", "_")}-{algorithm}-results-{DateTimeOffset.Now.ToUnixTimeSeconds()}.json"));
+        
+        AnsiConsole.MarkupLine(await results.SaveBagToJsonAsync(resultsFile)
+            ? $"[green]results saved to[/] [blue]{resultsFile.FullName.EscapeMarkup()}[/]" 
+            : "[red]failed to save results file[/]");
+    }
 });
 
 // root command
 var rootCommand = new RootCommand("A simple, portable, directory hashing tool")
 {
-    Options = {  algorithmOption },
+    Options = {  algorithmOption, progressOnlyOption },
     Subcommands = {  createCommand, validateCommand }
 };
 

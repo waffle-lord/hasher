@@ -5,6 +5,8 @@ public class HashData
     public string Hash { get; private set; }
     public string RelativePath { get; private set; }
 
+    public bool Found = false;
+
     public HashData(string hashInfo)
     {
         var info = hashInfo.Trim().Split(" :: ");
