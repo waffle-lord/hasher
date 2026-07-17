@@ -182,33 +182,25 @@ validateCommand.SetAction(async parseResult =>
         _ => Color.Aqua
     };
 
-    var hashAction = new Action<string, string, string, ValidationResult>((_, actualHash, relativePath, validationResult) =>
+    void CollectAndOutputHashInfo(string expectedHash, string actualHash, string relativePath, ValidationResult validationResult)
     {
         var color = GetValidationColor(validationResult);
-        results.CountOnly(validationResult);
 
-        if (!progressOnly)
+        if (saveResults)
         {
-            var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
-            AnsiConsole.MarkupLine(
-                $"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
+            results.AddAndCount(new FileCheckResult(expectedHash, actualHash, relativePath, validationResult));
         }
-    });
+        else
+        {
+            results.CountOnly(validationResult);
+        }
 
-    if (saveResults)
-    {
-        hashAction = (expectedHash, actualHash, relativePath, validationResult) =>
-            {
-                var color = GetValidationColor(validationResult);
-                results.AddAndCount(new FileCheckResult(expectedHash, actualHash, relativePath, validationResult));
+        if (progressOnly) 
+            return;
                 
-                if (!progressOnly)
-                {
-                    var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
-                    AnsiConsole.MarkupLine(
-                        $"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
-                }
-            };
+        var resultKind = new string(' ', 11).Insert(0, validationResult.ToString());
+        AnsiConsole.MarkupLine(
+            $"[{color}]{resultKind.EscapeMarkup()}[/][gray]|[/] [{color}]{actualHash.EscapeMarkup()}[/] [gray]::[/] [{color}]{relativePath.EscapeMarkup()}[/]");
     }
 
     await AnsiConsole.Progress().Columns(
@@ -231,18 +223,18 @@ validateCommand.SetAction(async parseResult =>
             if (foundHash == null)
             {
                 // unexpected file
-                hashAction.Invoke("n/a", hash, relativeFilePath, ValidationResult.Unexpected);
+                CollectAndOutputHashInfo("n/a", hash, relativeFilePath, ValidationResult.Unexpected);
             }
             else if (foundHash.Hash == hash)
             {
                 // match hash
-                hashAction.Invoke(foundHash.Hash, hash, relativeFilePath, ValidationResult.Match);
+                CollectAndOutputHashInfo(foundHash.Hash, hash, relativeFilePath, ValidationResult.Match);
                 foundHash.Found = true;
             }
             else
             {
                 // mismatch hash
-                hashAction.Invoke(foundHash.Hash, hash, relativeFilePath, ValidationResult.Mismatch);
+                CollectAndOutputHashInfo(foundHash.Hash, hash, relativeFilePath, ValidationResult.Mismatch);
                 foundHash.Found = true;
             }
 
@@ -257,7 +249,7 @@ validateCommand.SetAction(async parseResult =>
         foreach (var hashData in hashDataList.Where(x => !x.Found))
         {
             // missing files
-            hashAction.Invoke(hashData.Hash, "n/a", hashData.RelativePath, ValidationResult.Missing);
+            CollectAndOutputHashInfo(hashData.Hash, "n/a", hashData.RelativePath, ValidationResult.Missing);
         }
     }
 

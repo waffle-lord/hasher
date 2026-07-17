@@ -17,22 +17,22 @@ public class FileValidationResults
         switch (result)
         {
             case ValidationResult.Match:
-                TotalMatch++;
+                Interlocked.Increment(ref TotalMatch);
                 break;
             case ValidationResult.Mismatch:
-                TotalMisMatch++;
+                Interlocked.Increment(ref TotalMisMatch);
                 break;
             case ValidationResult.Missing:
-                TotalMissing++;
+                Interlocked.Increment(ref TotalMissing);
                 break;
             case ValidationResult.Unexpected:
-                TotalUnexpected++;
+                Interlocked.Increment(ref TotalUnexpected);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(result), result, null);
         }
     }
-
+    
     public void CountOnly(ValidationResult result)
     {
         CountResult(result);
