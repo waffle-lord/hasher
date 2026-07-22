@@ -20,3 +20,7 @@ hasher.exe validate
 # or specify a direcotry or algorithm
 hasher.exe validate "C:\some\folder\path" --algorithm SHA256
 ```
+```powershell
+# save the validation output as a json file. This will be placed in the folder you are validating
+hasher.exe validate --save-results
+```
