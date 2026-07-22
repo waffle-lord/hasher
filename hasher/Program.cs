@@ -30,10 +30,10 @@ var saveResultsOption = new Option<bool>("--save-results")
     DefaultValueFactory = _ => false
 };
 
-var showStatsOption = new Option<bool>("--show-stats")
+var noStatsOption = new Option<bool>("--no-stats")
 {
-    Description = "Show stats at the end of operation",
-    Aliases = { "-ss", "-stats" },
+    Description = "Don't show stats at the end of validation",
+    Aliases = { "-ns" },
     Arity = ArgumentArity.ZeroOrOne,
     DefaultValueFactory = _ => false
 };
@@ -65,7 +65,7 @@ var validateCommand = new Command("validate")
 {
     Arguments = { pathArgument },
     Aliases = { "v" },
-    Options = { saveResultsOption, showStatsOption }
+    Options = { saveResultsOption, noStatsOption }
 };
         
 // command actions
@@ -143,7 +143,7 @@ validateCommand.SetAction(async parseResult =>
 {
     var pathArg = parseResult.GetValue(pathArgument);
     var algorithm = parseResult.GetValue(algorithmOption);
-    var showStats = parseResult.GetValue(showStatsOption);
+    var noStats = parseResult.GetValue(noStatsOption);
     var saveResults = parseResult.GetValue(saveResultsOption);
     var progressOnly = parseResult.GetValue(progressOnlyOption);
     
@@ -259,7 +259,7 @@ validateCommand.SetAction(async parseResult =>
         ? "[green]All files are OK[/]"
         : "[red]Some files failed validation[/]");
 
-    if (showStats)
+    if (!noStats)
     {
         // output stats
         AnsiConsole.WriteLine();
